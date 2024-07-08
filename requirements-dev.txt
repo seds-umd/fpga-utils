@@ -1,0 +1,5 @@
+cocotb
+cocotbext-axi
+numpy
+
+-e .
