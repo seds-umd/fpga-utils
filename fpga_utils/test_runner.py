@@ -20,7 +20,7 @@ def last_modified(sources: Union[Path, List[Path]]):
             t = sources.stat().st_mtime
         except FileNotFoundError:
             t = 0
-    
+
     return t
 
 
@@ -61,7 +61,9 @@ def run_wrapper(
         sources.extend([source_path / f"{source}.scala" for source in spinal_sources])
 
     if last_modified(sources) > last_modified(gen_path):
-        ret = subprocess.run(['sbt', f'runMain {package}.{top_level}Verilog'], cwd=proj_path.resolve())
+        ret = subprocess.run(
+            ["sbt", f"runMain {package}.{top_level}Verilog"], cwd=proj_path.resolve()
+        )
         assert ret.returncode == 0, "SpinalHDL error"
     else:
         print("Generated Verilog up to date, skipping regeneration")
@@ -70,12 +72,16 @@ def run_wrapper(
     verilog_sources = [proj_path / gen_dir / f"{top_level}.v"]
 
     runner = get_runner(sim)
+
     runner.build(
         verilog_sources=verilog_sources,
         hdl_toplevel=top_level,
         always=True,
+        waves=True,
     )
 
     runner.test(
-        hdl_toplevel=top_level, test_module=f"test_{top_level.lower()}", waves=True
+        hdl_toplevel=top_level,
+        test_module=f"test_{top_level.lower()}",
+        waves=True,
     )
