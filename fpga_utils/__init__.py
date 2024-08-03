@@ -1,2 +1,3 @@
 from .bus import *
-from .tb import *
+from .dsp import *
+from .testbench import *

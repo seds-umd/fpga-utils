@@ -2,7 +2,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
-class TB_Template:
+class TbTemplate:
     def __init__(self, dut, main_clk="clk", period=10):
         self.dut = dut
         self.period = period
