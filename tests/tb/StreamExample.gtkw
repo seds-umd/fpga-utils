@@ -1,0 +1,51 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Sun Aug 25 02:49:33 2024
+[*]
+[dumpfile] "/home/nathan/seds/fpga-utils/tests/tb/sim_build/StreamExample.fst"
+[dumpfile_mtime] "Sun Aug 25 02:47:41 2024"
+[dumpfile_size] 2187
+[savefile] "/home/nathan/seds/fpga-utils/tests/tb/StreamExample.gtkw"
+[timestart] 307100
+[size] 1908 1007
+[pos] -1 -1
+*-15.000000 326700 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 214
+[signals_width] 286
+[sst_expanded] 1
+[sst_vpaned_height] 295
+@28
+StreamExample.clk
+StreamExample.reset
+@200
+-
+@22
+StreamExample.io_a_in_payload[7:0]
+@28
+StreamExample.io_a_in_ready
+StreamExample.io_a_in_valid
+@22
+StreamExample.io_a_out_payload[7:0]
+@28
+StreamExample.io_a_out_ready
+StreamExample.io_a_out_valid
+@200
+-
+@22
+StreamExample.io_b_in_payload_fragment[15:0]
+@28
+StreamExample.io_b_in_payload_last
+StreamExample.io_b_in_ready
+StreamExample.io_b_in_valid
+@200
+-
+@24
+StreamExample.io_d_in_payload_fragment_b[1:0]
+StreamExample.io_d_in_payload_fragment_g[1:0]
+StreamExample.io_d_in_payload_fragment_r[1:0]
+@28
+StreamExample.io_d_in_payload_last
+StreamExample.io_d_in_ready
+StreamExample.io_d_in_valid
+[pattern_trace] 1
+[pattern_trace] 0

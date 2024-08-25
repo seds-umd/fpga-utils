@@ -43,8 +43,6 @@ case class StreamExample() extends Component {
   // io.e_out <-/< io.e_in
   io.f_out <-< io.f_in
   io.g_out <-< io.g_in
-
-  Blank()
 }
 
 object StreamExampleVerilog extends App {

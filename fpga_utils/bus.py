@@ -9,6 +9,20 @@ def random_pause():
         yield np.random.choice([0, 1])
 
 
+# Simulate sample rate
+def ratio_pause(f=50, fs=4.092):
+    x = 0
+
+    while True:
+        x += 1 / f
+
+        if x > 1 / fs:
+            x -= 1 / fs
+            yield False
+        else:
+            yield True
+
+
 def stream_axis_bus(dut, prefix: str, fragment: bool = False, user: bool = False):
     axi_bus = axi.AxiStreamBus(dut)
 

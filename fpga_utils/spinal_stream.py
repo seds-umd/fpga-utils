@@ -27,6 +27,7 @@ THE SOFTWARE.
 """
 
 import logging
+import sys
 from dataclasses import dataclass
 
 import cocotb
@@ -69,49 +70,11 @@ class SpinalStreamConfig:
 
         return cfg
 
-    # @staticmethod
-    # def create_bundle(signals: dict, fragment: bool = False, flow: bool = False):
-    #     """Create a bus with multiple payload signals.
+    def simple(self):
+        return len(self.payload_keys) == 1
 
-    #     Signals dict must contain all bus signals, including control signals.
-
-    #     Args:
-    #         signals (dict): Dict mapping short names to full signal names.
-    #         fragment (bool, optional): True if bus is fragment. Defaults to False.
-    #         flow (bool, optional): True if bus is flow. Defaults to False.
-
-    #     Returns:
-    #         SpinalStreamConfig: Generated config.
-    #     """
-    #     cfg = SpinalStreamConfig()
-
-    #     cfg.simple = False
-    #     cfg.bundle = signals
-    #     cfg.fragment = fragment
-    #     cfg.flow = flow
-
-    #     return cfg
-
-    # @staticmethod
-    # def create_simple(signals: dict, fragment: bool = False, flow: bool = False):
-    #     """Create a simple bus config with one payload signal.
-
-    #     Args:
-    #         width (int): Number of bits in payload
-    #         fragment (bool, optional): True if bus is fragment. Defaults to False.
-    #         flow (bool, optional): True if bus is flow. Defaults to False.
-
-    #     Returns:
-    #         SpinalStreamConfig: Generated config.
-    #     """
-    #     cfg = SpinalStreamConfig()
-
-    #     cfg.simple = True
-    #     cfg.bundle = signals
-    #     cfg.fragment = fragment
-    #     cfg.flow = flow
-
-    #     return cfg
+    def has_last(self):
+        return "last" in self.ctrl_keys
 
 
 class SpinalStreamFrame:
@@ -143,16 +106,19 @@ class SpinalStreamFrame:
             self.sim_time_start = payload.sim_time_start
             self.sim_time_end = payload.sim_time_end
             self.tx_complete = payload.tx_complete
-        elif len(config.payload_keys) == 1:
+        elif config.simple():
             # Single payload
-            self.payload = list(payload)
+            if payload is None:
+                self.payload = list()
+            else:
+                self.payload = list(payload)
         elif type(payload) is dict and payload is not None:
             # Payload bundle dict
             self.payload = payload
         else:
             # Empty dict
             self.payload = {}
-            for key in config.bundle:
+            for key in config.payload_keys:
                 self.payload[key] = list()
 
         if tx_complete is not None:
@@ -179,8 +145,12 @@ class SpinalStreamFrame:
     def __repr__(self):
         rep = f"{type(self).__name__}("
 
-        for key in self.config.bundle:
-            rep += f"{key}={self.payload[key]!r}, "
+        if self.config.simple():
+            rep += str(self.payload)
+            rep += ", "
+        else:
+            for key in self.config.payload_keys:
+                rep += f"{key}={self.payload[key]!r}, "
 
         rep += f"sim_time_start={self.sim_time_start!r}, "
         rep += f"sim_time_end={self.sim_time_end!r})"
@@ -189,17 +159,33 @@ class SpinalStreamFrame:
         return rep
 
     def __len__(self):
-        if len(self.config.payload_keys) == 1:
+        if self.config.simple():
             return len(self.payload)
+        elif type(self.payload[self.config.payload_keys[0]]) == int:
+            return 1
         else:
-            return len(self.payload[self.config.bundle[0]])
+            return len(self.payload[self.config.payload_keys[0]])
 
     def __iter__(self):
         return self.payload.__iter__()
 
-    # TODO: is this needed anywhere?
-    # def __bytes__(self):
-    #     return bytes(self.payload)
+
+def merge_frames(a: SpinalStreamFrame, b: SpinalStreamFrame):
+    assert a.config == b.config
+
+    # Timestamps
+    a.sim_time_end = b.sim_time_end
+
+    if a.config.simple():
+        a.payload.extend(b.payload)
+    else:
+        for key in a.config.payload_keys:
+            if type(b.payload[key]) is int:
+                a.payload[key].append(b.payload[key])
+            else:
+                a.payload[key].extend(b.payload[key])
+
+    return a
 
 
 class SpinalStreamBus(Bus):
@@ -227,6 +213,7 @@ class SpinalStreamBase(Reset):
         clock,
         reset=None,
         reset_active_level=True,
+        quiet=True,
         *args,
         **kwargs,
     ):
@@ -238,6 +225,9 @@ class SpinalStreamBase(Reset):
             self.log = logging.getLogger(f"cocotb.{bus._entity._name}.{bus._name}")
         else:
             self.log = logging.getLogger(f"cocotb.{bus._entity._name}")
+
+        if quiet:
+            self.log.setLevel(logging.WARNING)
 
         stream_type = "flow" if self.bus.config.flow else "stream"
         self.log.info(f"SpinalHDL {stream_type} {self._type}")
@@ -278,7 +268,15 @@ class SpinalStreamBase(Reset):
         self._init_reset(reset, reset_active_level)
 
     @classmethod
-    def from_prefix(cls, dut: cocotb.handle.SimHandleBase, prefix: str, clk="clk", reset="reset", *args, **kwargs):
+    def from_prefix(
+        cls,
+        dut: cocotb.handle.SimHandleBase,
+        prefix: str,
+        clk="clk",
+        reset="reset",
+        *args,
+        **kwargs,
+    ):
         if type(clk) == str:
             clk = getattr(dut, clk)
 
@@ -309,10 +307,10 @@ class SpinalStreamBase(Reset):
         for sig in ctrl_signals:
             if sig.endswith("ready"):
                 signal_dict["ready"] = sig
-            
+
             if sig.endswith("valid"):
                 signal_dict["valid"] = sig
-            
+
             if sig.endswith("last"):
                 signal_dict["last"] = sig
 
@@ -544,11 +542,26 @@ class SpinalStreamSource(SpinalStreamBase, SpinalStreamPause):
                     frame_offset = 0
 
                 if frame and not self.pause:
-                    if self.bus.config.simple:
-                        payload_val = frame.payload[frame_offset]
+                    # TODO: is there a faster way to iterate through payload?
+                    if type(frame.payload) == list:
+                        payload = frame.payload[frame_offset]
                     else:
-                        payload_val = {key: item[frame_offset] for key, item in frame.payload}
+                        payload = {
+                            key: item[frame_offset]
+                            for key, item in frame.payload.items()
+                        }
                     frame_offset += 1
+
+                    # Set payload signals
+                    if type(frame.payload) == list:
+                        # TODO: payload name
+                        getattr(self.bus, self.bus.config.payload_keys[0]).value = int(
+                            payload
+                        )
+                    else:
+                        for key in self.bus.config.payload_keys:
+                            sig: cocotb.handle.BinaryValue = getattr(self.bus, key)
+                            sig.value = int(payload[key])
 
                     # Handle last
                     if frame_offset >= len(frame):
@@ -559,18 +572,6 @@ class SpinalStreamSource(SpinalStreamBase, SpinalStreamPause):
                         self.current_frame = None
                     else:
                         last_val = 0
-
-                    # Set payload signals
-                    if self.bus.config.simple:
-                        # TODO: payload name
-                        if self.bus.config.fragment:
-                            self.bus.fragment.value = payload_val
-                        else:
-                            self.bus.payload.value = payload_val
-                    else:
-                        for sig in self.bus.config.bundle:
-                            v = getattr(self.bus, sig).value
-                            v = payload_val[sig]
 
                     # Set valid and last signals
                     if has_valid:
@@ -648,19 +649,40 @@ class SpinalStreamMonitor(SpinalStreamBase):
         # TODO: handle bundle
         while not self.read_queue:
             frame = await self.recv()
-            self.read_queue.extend(frame.payload)
+            if frame.config.simple():
+                self.read_queue.extend(frame.payload)
+            else:
+                self.read_queue.append(frame.payload)
         return self.read_nowait(count)
 
     def read_nowait(self, count=-1):
-        # TODO: handle bundle
+        if self.bus.config.has_last():
+            return self.recv_nowait()
+
         while not self.empty():
             frame = self.recv_nowait()
-            self.read_queue.extend(frame.payload)
-        if count < 0:
+
+            self.read_queue.append(frame)
+
+        if len(self.read_queue) == 0:
+            return None
+        elif count < 0:
             count = len(self.read_queue)
+        elif len(self.read_queue) < count:
+            count = len(self.read_queue)
+
         data = self.read_queue[:count]
         del self.read_queue[:count]
-        return data
+
+        if count == 1:
+            return data[0]
+
+        res = data.pop(0)
+
+        while len(data) > 0:
+            res = merge_frames(res, data.pop(0))
+
+        return res
 
     def idle(self):
         return not self.active
@@ -699,6 +721,7 @@ class SpinalStreamMonitor(SpinalStreamBase):
 
         wake_event = self.wake_event.wait()
 
+        # TODO: fix all this
         while True:
             await clock_edge_event
 
@@ -801,10 +824,6 @@ class SpinalStreamSink(SpinalStreamMonitor, SpinalStreamPause):
         has_ready = hasattr(self.bus, "ready")
         has_valid = hasattr(self.bus, "valid")
         has_last = hasattr(self.bus, "last")
-        has_tkeep = hasattr(self.bus, "tkeep")
-        has_tid = hasattr(self.bus, "tid")
-        has_tdest = hasattr(self.bus, "tdest")
-        has_tuser = hasattr(self.bus, "tuser")
 
         clock_edge_event = RisingEdge(self.clock)
 
@@ -821,26 +840,19 @@ class SpinalStreamSink(SpinalStreamMonitor, SpinalStreamPause):
 
             if ready_sample and valid_sample:
                 if not frame:
-                    if self.byte_size == 8:
-                        frame = SpinalStreamFrame(self.bus.config)
-                    else:
-                        frame = SpinalStreamFrame(self.bus.config)
+                    frame = SpinalStreamFrame(self.bus.config)
                     frame.sim_time_start = get_sim_time()
                     self.active = True
 
-                for offset in range(self.byte_lanes):
-                    frame.tdata.append(
-                        (self.bus.tdata.value.integer >> (offset * self.byte_size))
-                        & self.byte_mask
-                    )
-                    if has_tkeep:
-                        frame.tkeep.append((self.bus.tkeep.value.integer >> offset) & 1)
-                    if has_tid:
-                        frame.tid.append(self.bus.tid.value.integer)
-                    if has_tdest:
-                        frame.tdest.append(self.bus.tdest.value.integer)
-                    if has_tuser:
-                        frame.tuser.append(self.bus.tuser.value.integer)
+                    # if not self.bus.config.simple():
+                    #     for key in self.bus.config.payload_keys:
+                    #         frame.payload[key] = list()
+
+                if self.bus.config.simple():
+                    frame.payload.append(self.bus.payload.value.integer)
+                else:
+                    for key in self.bus.config.payload_keys:
+                        frame.payload[key].append(getattr(self.bus, key).value.integer)
 
                 if not has_last or self.bus.last.value:
                     frame.sim_time_end = get_sim_time()

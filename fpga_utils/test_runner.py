@@ -68,8 +68,11 @@ def run_wrapper(
     else:
         print("Generated Verilog up to date, skipping regeneration")
 
-    # TODO: add custom verilog sources
-    verilog_sources = [proj_path / gen_dir / f"{top_level}.v"]
+    if verilog_sources is not None:
+        verilog_sources = [proj_path / Path(p) for p in verilog_sources]
+    else:
+        verilog_sources = []
+    verilog_sources.append(proj_path / gen_dir / f"{top_level}.v")
 
     runner = get_runner(sim)
 

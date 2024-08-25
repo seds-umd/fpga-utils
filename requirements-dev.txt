@@ -1,5 +1,7 @@
 cocotb
 cocotbext-axi
+gps-model @ git+ssh://git@github.com/seds-umd/gps-model.git
 numpy
+matplotlib
 
 -e .
