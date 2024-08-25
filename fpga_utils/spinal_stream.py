@@ -124,6 +124,17 @@ class SpinalStreamFrame:
         if tx_complete is not None:
             self.tx_complete = tx_complete
 
+    @staticmethod
+    def zero_frame(config: SpinalStreamConfig, size: int = 1):
+        payload = {}
+
+        for key in config.payload_keys:
+            payload[key] = [0] * size
+
+        frame = SpinalStreamFrame(config, payload)
+
+        return frame
+
     def handle_tx_complete(self):
         if isinstance(self.tx_complete, Event):
             self.tx_complete.set(self)
@@ -405,8 +416,9 @@ class SpinalStreamPause:
         if self._pause_generator is not None:
             self._pause_cr = cocotb.start_soon(self._run_pause())
 
-    def clear_pause_generator(self):
+    def clear_pause_generator(self, pause_val: bool = False):
         self.set_pause_generator(None)
+        self.pause = pause_val
 
     async def _run_pause(self):
         clock_edge_event = RisingEdge(self.clock)

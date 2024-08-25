@@ -3,5 +3,5 @@
 wave_files=( sim_build/*.fst )
 setup_files=( *.gtkw )
 
-echo gtkwave $setup_files $wave_files
-gtkwave $setup_files $wave_files
+echo gtkwave $wave_files $setup_files
+gtkwave $wave_files $setup_files

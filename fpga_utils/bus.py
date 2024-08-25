@@ -6,7 +6,7 @@ from cocotbext import axi
 # Random pause generator for AXI bus
 def random_pause():
     while True:
-        yield np.random.choice([0, 1])
+        yield np.random.choice([False, True])
 
 
 # Simulate sample rate
