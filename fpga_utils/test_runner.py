@@ -30,6 +30,7 @@ def run_wrapper(
     proj_dir: str,
     source_dir: str,
     gen_dir: str,
+    package_path: str = None,
     spinal_sources: list = None,
     verilog_sources: list = None,
     sim: str = "icarus",
@@ -41,6 +42,7 @@ def run_wrapper(
         proj_dir (str): Relative path from testbench dir to project dir
         source_dir (str): Relative path from project dir to Spinal source dir
         gen_dir (str): Relative path from project dir to Spinal gen dir
+        package_path (str): Submodule path to top level
         spinal_sources (list, optional): List of extra SpinalHDL sources. Defaults to None.
         verilog_sources (list, optional): List of extra Verilog sources. Defaults to None.
         sim (str, optional): Simulator. Defaults to "icarus".
@@ -55,14 +57,14 @@ def run_wrapper(
     source_path = Path(proj_path / source_dir).resolve()
     gen_path = Path(proj_path / gen_dir / f"{top_level}.v").resolve()
 
-    sources = [source_path / f"{top_level}.scala"]
+    sources = [source_path / package_path / f"{top_level}.scala"]
 
     if spinal_sources is not None:
         sources.extend([source_path / f"{source}.scala" for source in spinal_sources])
 
     if last_modified(sources) > last_modified(gen_path):
         ret = subprocess.run(
-            ["sbt", f"runMain {package}.{top_level}Verilog"], cwd=proj_path.resolve()
+            ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"], cwd=proj_path.resolve()
         )
         assert ret.returncode == 0, "SpinalHDL error"
     else:
