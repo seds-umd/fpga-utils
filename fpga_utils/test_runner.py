@@ -63,8 +63,10 @@ def run_wrapper(
         sources.extend([source_path / f"{source}.scala" for source in spinal_sources])
 
     if last_modified(sources) > last_modified(gen_path):
+        cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
+        print(cmd)
         ret = subprocess.run(
-            ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"], cwd=proj_path.resolve()
+            cmd, cwd=proj_path.resolve()
         )
         assert ret.returncode == 0, "SpinalHDL error"
     else:
