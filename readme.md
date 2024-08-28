@@ -4,6 +4,8 @@
 
 # New Project Setup
 
+* Test file must have `#!/usr/bin/env python` at the top
+
 # Development
 
 # Common Issues

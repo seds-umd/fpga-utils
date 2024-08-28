@@ -57,14 +57,17 @@ def run_wrapper(
     source_path = Path(proj_path / source_dir).resolve()
     gen_path = Path(proj_path / gen_dir / f"{top_level}.v").resolve()
 
-    sources = [source_path / package_path / f"{top_level}.scala"]
+    if package_path is not None:
+        sources = [source_path / package_path / f"{top_level}.scala"]
+    else:
+        sources = [source_path / f"{top_level}.scala"]
 
     if spinal_sources is not None:
         sources.extend([source_path / f"{source}.scala" for source in spinal_sources])
 
     if last_modified(sources) > last_modified(gen_path):
         cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
-        print(cmd)
+        print(' '.join(cmd))
         ret = subprocess.run(
             cmd, cwd=proj_path.resolve()
         )
