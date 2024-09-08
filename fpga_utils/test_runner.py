@@ -30,6 +30,7 @@ def run_wrapper(
     proj_dir: str,
     source_dir: str,
     gen_dir: str,
+    scala_name: str = None,
     package_path: str = None,
     spinal_sources: list = None,
     verilog_sources: list = None,
@@ -48,6 +49,8 @@ def run_wrapper(
         sim (str, optional): Simulator. Defaults to "icarus".
     """
 
+    # TODO: multi level package path still isn't ideal
+
     sim = os.getenv("SIM", sim)
 
     # Get path of top level script
@@ -57,16 +60,22 @@ def run_wrapper(
     source_path = Path(proj_path / source_dir).resolve()
     gen_path = Path(proj_path / gen_dir / f"{top_level}.v").resolve()
 
+    if scala_name == None:
+        scala_name = top_level
+
     if package_path is not None:
-        sources = [source_path / package_path / f"{top_level}.scala"]
+        sources = [source_path / package_path / f"{scala_name}.scala"]
     else:
-        sources = [source_path / f"{top_level}.scala"]
+        sources = [source_path / f"{scala_name}.scala"]
 
     if spinal_sources is not None:
         sources.extend([source_path / f"{source}.scala" for source in spinal_sources])
 
     if last_modified(sources) > last_modified(gen_path):
-        cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
+        if package_path is not None:
+            cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
+        else:
+            cmd = ["sbt", f"runMain {package}.{top_level}Verilog"]
         print(' '.join(cmd))
         ret = subprocess.run(
             cmd, cwd=proj_path.resolve()
@@ -92,6 +101,6 @@ def run_wrapper(
 
     runner.test(
         hdl_toplevel=top_level,
-        test_module=f"test_{top_level.lower()}",
+        test_module=f"test_{scala_name.lower()}",
         waves=True,
     )
