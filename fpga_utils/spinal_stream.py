@@ -516,9 +516,7 @@ class SpinalStreamSource(SpinalStreamBase, SpinalStreamPause):
                 self.bus.last.value = 0
 
             if self.current_frame:
-                self.log.warning(
-                    "Flushed transmit frame during reset: %s", self.current_frame
-                )
+                self.log.warning("Flushed transmit frame during reset")
                 self.current_frame.handle_tx_complete()
                 self.current_frame = None
 
@@ -664,7 +662,7 @@ class SpinalStreamMonitor(SpinalStreamBase):
             if frame.config.simple():
                 self.read_queue.extend(frame.payload)
             else:
-                self.read_queue.append(frame.payload)
+                self.read_queue.append(frame)
         return self.read_nowait(count)
 
     def read_nowait(self, count=-1):
