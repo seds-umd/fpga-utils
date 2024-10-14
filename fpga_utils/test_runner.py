@@ -35,6 +35,7 @@ def run_wrapper(
     spinal_sources: list = None,
     verilog_sources: list = None,
     sim: str = "icarus",
+    scala: bool = True,
 ):
     """SpinalHDL wrapper for cocotb test runner
 
@@ -71,24 +72,27 @@ def run_wrapper(
     if spinal_sources is not None:
         sources.extend([source_path / f"{source}.scala" for source in spinal_sources])
 
-    if last_modified(sources) > last_modified(gen_path):
-        if package_path is not None:
-            cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
+    if scala:
+        if last_modified(sources) > last_modified(gen_path):
+            if package_path is not None:
+                cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
+            else:
+                cmd = ["sbt", f"runMain {package}.{top_level}Verilog"]
+            print(' '.join(cmd))
+            ret = subprocess.run(
+                cmd, cwd=proj_path.resolve()
+            )
+            assert ret.returncode == 0, "SpinalHDL error"
         else:
-            cmd = ["sbt", f"runMain {package}.{top_level}Verilog"]
-        print(' '.join(cmd))
-        ret = subprocess.run(
-            cmd, cwd=proj_path.resolve()
-        )
-        assert ret.returncode == 0, "SpinalHDL error"
-    else:
-        print("Generated Verilog up to date, skipping regeneration")
+            print("Generated Verilog up to date, skipping regeneration")
 
     if verilog_sources is not None:
         verilog_sources = [proj_path / Path(p) for p in verilog_sources]
     else:
         verilog_sources = []
-    verilog_sources.append(proj_path / gen_dir / f"{top_level}.v")
+
+    if scala:
+        verilog_sources.append(proj_path / gen_dir / f"{top_level}.v")
 
     runner = get_runner(sim)
 
