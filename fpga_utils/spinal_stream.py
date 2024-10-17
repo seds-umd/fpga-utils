@@ -285,6 +285,7 @@ class SpinalStreamBase(Reset):
         prefix: str,
         clk="clk",
         reset="reset",
+        axis=False,
         *args,
         **kwargs,
     ):
@@ -300,7 +301,12 @@ class SpinalStreamBase(Reset):
         payload_signals = []
 
         for sig in all_signals:
-            if (
+            if axis and sig.startswith(f"{prefix}_t"):
+                if sig.endswith("ready") or sig.endswith("valid"):
+                    ctrl_signals.append(sig)
+                else:
+                    payload_signals.append(sig)
+            elif (
                 sig.startswith(f"{prefix}_ready")
                 or sig.startswith(f"{prefix}_valid")
                 or (sig.startswith(f"{prefix}_payload") and sig.endswith(f"last"))
