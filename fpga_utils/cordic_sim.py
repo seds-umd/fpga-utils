@@ -1,3 +1,4 @@
+import cocotb
 import numpy as np
 from cocotb.handle import HierarchyObject
 from fpga_utils import spinal_stream as stream
@@ -78,10 +79,10 @@ class CordicSim:
         self.dout_width = dout_width
 
         self.phase = stream.SpinalStreamSink.from_prefix(
-            self.module, "s_axis_phase", "aclk", "aresetn", axis=True
+            self.module, "s_axis_phase", "aclk", "aresetn", axis=True, reset_active_level=False
         )
         self.dout = stream.SpinalStreamSource.from_prefix(
-            self.module, "m_axis_dout", "aclk", "aresetn", axis=True
+            self.module, "m_axis_dout", "aclk", "aresetn", axis=True, reset_active_level=False
         )
 
         cocotb.start_soon(self._run())
@@ -103,4 +104,4 @@ class CordicSim:
             for i in range(len(payload["tdata"])):
                 payload["tdata"][i] = self.compute(payload["tdata"][i])
 
-            await self.dout.send(payload)
+            self.dout.send_nowait(payload)
