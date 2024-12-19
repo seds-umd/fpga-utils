@@ -78,6 +78,9 @@ class CordicSim:
         self.phase_width = phase_width
         self.dout_width = dout_width
 
+        self.past_inputs = []
+        self.past_outputs = []
+
         self.phase = stream.SpinalStreamSink.from_prefix(
             self.module, "s_axis_phase", "aclk", "aresetn", axis=True, reset_active_level=False
         )
@@ -93,6 +96,9 @@ class CordicSim:
         phase *= 2 * np.pi
 
         val = np.exp(1j * phase)
+
+        self.past_inputs.append(phase)
+        self.past_outputs.append(val)
 
         return encode_complex(val, self.dout_width)
 
