@@ -725,6 +725,7 @@ class SpinalStreamMonitor(SpinalStreamBase):
             await event
             self.wake_event.set()
 
+    # Same for monitor and sink
     async def _run(self):
         frame = None
         self.active = False
@@ -737,8 +738,10 @@ class SpinalStreamMonitor(SpinalStreamBase):
 
         wake_event = self.wake_event.wait()
 
-        # TODO: fix all this
         while True:
+            if self._type == "sink":
+                pause_sample = bool(self.pause)
+
             await clock_edge_event
 
             # read handshake signals
@@ -747,18 +750,15 @@ class SpinalStreamMonitor(SpinalStreamBase):
 
             if ready_sample and valid_sample:
                 if not frame:
-                    if self.byte_size == 8:
-                        frame = SpinalStreamFrame(self.bus.config)
-                    else:
-                        frame = SpinalStreamFrame(self.bus.config)
+                    frame = SpinalStreamFrame(self.bus.config)
                     frame.sim_time_start = get_sim_time()
                     self.active = True
 
-                for offset in range(self.byte_lanes):
-                    frame.tdata.append(
-                        (self.bus.tdata.value.integer >> (offset * self.byte_size))
-                        & self.byte_mask
-                    )
+                if self.bus.config.simple():
+                    frame.payload.append(self.bus.payload.value.integer)
+                else:
+                    for key in self.bus.config.payload_keys:
+                        frame.payload[key].append(getattr(self.bus, key).value.integer)
 
                 if not has_last or self.bus.last.value:
                     frame.sim_time_end = get_sim_time()
@@ -774,8 +774,19 @@ class SpinalStreamMonitor(SpinalStreamBase):
             else:
                 self.active = bool(frame)
 
-                self.wake_event.clear()
-                await wake_event
+            if has_ready and self._type == "sink":
+                paused = self.full() or pause_sample
+
+                if self._type == "sink":
+                    self.bus.ready.value = not paused
+
+                if (not valid_sample or paused) and (pause_sample == bool(self.pause)):
+                    self.wake_event.clear()
+                    await wake_event
+            else:
+                if not valid_sample:
+                    self.wake_event.clear()
+                    await wake_event
 
 
 class SpinalStreamSink(SpinalStreamMonitor, SpinalStreamPause):
@@ -832,67 +843,3 @@ class SpinalStreamSink(SpinalStreamMonitor, SpinalStreamPause):
 
     def _dequeue(self, frame):
         self.wake_event.set()
-
-    async def _run(self):
-        frame = None
-        self.active = False
-
-        has_ready = hasattr(self.bus, "ready")
-        has_valid = hasattr(self.bus, "valid")
-        has_last = hasattr(self.bus, "last")
-
-        clock_edge_event = RisingEdge(self.clock)
-
-        wake_event = self.wake_event.wait()
-
-        while True:
-            pause_sample = bool(self.pause)
-
-            await clock_edge_event
-
-            # read handshake signals
-            ready_sample = (not has_ready) or self.bus.ready.value
-            valid_sample = (not has_valid) or self.bus.valid.value
-
-            if ready_sample and valid_sample:
-                if not frame:
-                    frame = SpinalStreamFrame(self.bus.config)
-                    frame.sim_time_start = get_sim_time()
-                    self.active = True
-
-                    # if not self.bus.config.simple():
-                    #     for key in self.bus.config.payload_keys:
-                    #         frame.payload[key] = list()
-
-                if self.bus.config.simple():
-                    frame.payload.append(self.bus.payload.value.integer)
-                else:
-                    for key in self.bus.config.payload_keys:
-                        frame.payload[key].append(getattr(self.bus, key).value.integer)
-
-                if not has_last or self.bus.last.value:
-                    frame.sim_time_end = get_sim_time()
-                    self.log.info("RX frame: %s", frame)
-
-                    self.queue_len_bytes += len(frame)
-                    self.queue_len_frames += 1
-
-                    self.queue.put_nowait(frame)
-                    self.active_event.set()
-
-                    frame = None
-            else:
-                self.active = bool(frame)
-
-            if has_ready:
-                paused = self.full() or pause_sample
-
-                self.bus.ready.value = not paused
-
-                if (not valid_sample or paused) and (pause_sample == bool(self.pause)):
-                    self.wake_event.clear()
-                    await wake_event
-            else:
-                if not valid_sample:
-                    self.wake_event.clear()
-                    await wake_event
