@@ -82,3 +82,30 @@ def generate_gps_samples(
     samples_quant /= 128
 
     return bits, samples, samples_quant
+
+def from_sfix(val: int, peak: int, width: int):
+    # 1 bit less because of sign
+    shift = width - peak - 1
+
+    if val >= 2 ** (width - 1):
+        val = val - 2**width
+
+    res = val / 2 ** (shift)
+
+    return res
+
+def to_sfix(val: float, peak: int, width: int):
+    assert val <= 2**peak * (1.0 - (1.0 / 2 ** (width - 1)))
+    assert val >= -(2**peak)
+
+    shift = width - peak - 1
+
+    if shift >= 0:
+        val = val * (1 << shift)
+    else:
+        val = val / (1 << -shift)
+
+    if val < 0:
+        val = val + 2**width
+
+    return int(val)
