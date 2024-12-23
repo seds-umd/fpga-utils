@@ -78,10 +78,8 @@ def run_wrapper(
                 cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
             else:
                 cmd = ["sbt", f"runMain {package}.{top_level}Verilog"]
-            print(' '.join(cmd))
-            ret = subprocess.run(
-                cmd, cwd=proj_path.resolve()
-            )
+            print(" ".join(cmd))
+            ret = subprocess.run(cmd, cwd=proj_path.resolve())
             assert ret.returncode == 0, "SpinalHDL error"
         else:
             print("Generated Verilog up to date, skipping regeneration")
@@ -96,15 +94,25 @@ def run_wrapper(
 
     runner = get_runner(sim)
 
+    if sim == "verilator":
+        build_args = ["-Wno-WIDTHTRUNC", "-Wno-WIDTHEXPAND"]
+        run_args = ["--trace", "--trace-fst", "--trace-structs"]
+        build_args.extend(run_args)
+    else:
+        build_args = []
+        run_args = []
+
     runner.build(
         verilog_sources=verilog_sources,
         hdl_toplevel=top_level,
         always=True,
         waves=True,
+        build_args=build_args,
     )
 
     runner.test(
         hdl_toplevel=top_level,
         test_module=f"test_{scala_name.lower()}",
         waves=True,
+        test_args=run_args,
     )
