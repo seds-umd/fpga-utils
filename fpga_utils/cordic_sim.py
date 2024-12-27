@@ -69,7 +69,7 @@ def decode_complex(x, width=9):
     return val
 
 
-class CordicSim:
+class CordicSinCosSim:
     def __init__(
         self, module: HierarchyObject, phase_width: int = 12, dout_width: int = 9
     ):
@@ -82,10 +82,20 @@ class CordicSim:
         self.past_outputs = []
 
         self.phase = stream.SpinalStreamSink.from_prefix(
-            self.module, "s_axis_phase", "aclk", "aresetn", axis=True, reset_active_level=False
+            self.module,
+            "s_axis_phase",
+            "aclk",
+            "aresetn",
+            axis=True,
+            reset_active_level=False,
         )
         self.dout = stream.SpinalStreamSource.from_prefix(
-            self.module, "m_axis_dout", "aclk", "aresetn", axis=True, reset_active_level=False
+            self.module,
+            "m_axis_dout",
+            "aclk",
+            "aresetn",
+            axis=True,
+            reset_active_level=False,
         )
 
         cocotb.start_soon(self._run())
@@ -105,6 +115,71 @@ class CordicSim:
     async def _run(self):
         while True:
             frame = await self.phase.recv()
+            payload = frame.payload
+
+            for i in range(len(payload["tdata"])):
+                payload["tdata"][i] = self.compute(payload["tdata"][i])
+
+            self.dout.send_nowait(payload)
+
+
+class CordicAtan2Sim:
+    def __init__(
+        self, module: HierarchyObject, input_width: int = 12, output_width: int = 11
+    ):
+        self.module = module
+
+        self.input_width = input_width
+        self.output_width = output_width
+
+        self.past_inputs = []
+        self.past_outputs = []
+
+        self.cartesian = stream.SpinalStreamSink.from_prefix(
+            self.module,
+            "s_axis_cartesian",
+            "aclk",
+            "aresetn",
+            axis=True,
+            reset_active_level=False,
+        )
+        self.dout = stream.SpinalStreamSource.from_prefix(
+            self.module,
+            "m_axis_dout",
+            "aclk",
+            "aresetn",
+            axis=True,
+            reset_active_level=False,
+        )
+
+        cocotb.start_soon(self._run())
+
+    def compute(self, cart: int) -> int:
+        size = ((self.input_width + 7) // 8) * 8
+        x = cart & (2**size - 1)
+        y = (cart >> size) & (2**size - 1)
+
+        if x > 2 ** (size - 1):
+            x -= 2**size
+
+        if y > 2 ** (size - 1):
+            y -= 2**size
+
+        if x == 0:
+            res = np.sign(y) * 0.5
+        else:
+            res = np.arctan(y / x) / np.pi
+        res *= 2 ** (self.output_width - 3)
+        res = int(res)
+
+        self.past_inputs.append((x, y))
+        self.past_outputs.append(res)
+
+        return res
+
+    async def _run(self):
+        while True:
+            frame = await self.cartesian.recv()
             payload = frame.payload
 
             for i in range(len(payload["tdata"])):

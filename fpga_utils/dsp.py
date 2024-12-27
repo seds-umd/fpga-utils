@@ -58,6 +58,7 @@ def generate_gps_samples(
         sample_phase=sample_phase,
         signal_power=noise_power,
     )
+    samples = (3/4 * 127) * np.ones(int(count))
 
     times_single = np.arange(4092)
 
@@ -82,6 +83,33 @@ def generate_gps_samples(
     samples_quant /= 128
 
     return bits, samples, samples_quant
+
+def generate_timestamp(count, period: int = 4092, offset: int = 0):
+    times_single = np.arange(period)
+
+    # Apply offset
+    times_single = np.roll(times_single, -offset)
+
+    # Repeat
+    times = np.tile(times_single, int(count / period) + 1)
+    times = times.astype(np.uint16)[0 : count]
+
+    return times
+
+def to_2b(samples):
+    re = samples.real.astype(np.int8).astype(np.uint8) >> 6
+    im = samples.imag.astype(np.int8).astype(np.uint8) >> 6
+
+    return re, im
+
+def quantize_2b(re, im):
+    re = (re << 6).astype(np.int8) | 0b100000
+    im = (im << 6).astype(np.int8) | 0b100000
+
+    samples = re + im * 1j
+    samples /= 128
+
+    return samples
 
 def from_sfix(val: int, peak: int, width: int):
     # 1 bit less because of sign
@@ -109,3 +137,25 @@ def to_sfix(val: float, peak: int, width: int):
         val = val + 2**width
 
     return int(val)
+
+def from_twos_comp(val: int | np.ndarray, width: int):
+    if type(val) == int:
+        if val >= 2 ** (width - 1):
+            val -= 2 ** width
+    elif type(val) == np.ndarray:
+        val[val >= 2 ** (width - 1)] -= 2 ** width
+    else:
+        raise TypeError(f"{type(val)} is not supported")
+
+    return val
+
+def to_twos_comp(val: int | np.ndarray, width: int):
+    if type(val) == int:
+        if val < 0:
+            val += 2 ** width
+    elif type(val) == np.ndarray:
+        val[val < 0] += 2 ** width
+    else:
+        raise TypeError(f"{type(val)} is not supported")
+
+    return val

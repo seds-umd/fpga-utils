@@ -758,7 +758,11 @@ class SpinalStreamMonitor(SpinalStreamBase):
                     frame.payload.append(self.bus.payload.value.integer)
                 else:
                     for key in self.bus.config.payload_keys:
-                        frame.payload[key].append(getattr(self.bus, key).value.integer)
+                        try:
+                            frame.payload[key].append(getattr(self.bus, key).value.integer)
+                        except ValueError:
+                            print(self.bus.config.bundle[key])
+                            raise ValueError()
 
                 if not has_last or self.bus.last.value:
                     frame.sim_time_end = get_sim_time()
