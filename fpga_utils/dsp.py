@@ -58,7 +58,6 @@ def generate_gps_samples(
         sample_phase=sample_phase,
         signal_power=noise_power,
     )
-    samples = (3/4 * 127) * np.ones(int(count))
 
     times_single = np.arange(4092)
 
