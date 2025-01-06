@@ -31,6 +31,8 @@ def run_wrapper(
     source_dir: str,
     gen_dir: str,
     scala_name: str = None,
+    scala_object: str = None,
+    verilog_name: str = None,
     package_path: str = None,
     spinal_sources: list = None,
     verilog_sources: list = None,
@@ -41,28 +43,39 @@ def run_wrapper(
 
     Args:
         top_level (str): Name of top level SpinalHDL module
+        package (str): Name of Scala package
         proj_dir (str): Relative path from testbench dir to project dir
         source_dir (str): Relative path from project dir to Spinal source dir
         gen_dir (str): Relative path from project dir to Spinal gen dir
-        package_path (str): Submodule path to top level
-        spinal_sources (list, optional): List of extra SpinalHDL sources. Defaults to None.
-        verilog_sources (list, optional): List of extra Verilog sources. Defaults to None.
+        scala_name (str, optional): Name of Scala file. Defaults to $top_level.scala
+        scala_object (str, optional): Name of Scala object that generates Verilog
+        verilog_name (str, optional): Name of generated Verilog file. Defaults to $top_level.v
+        package_path (str, optional): Submodule path to top level. Defaults to None
+        spinal_sources (list, optional): List of extra SpinalHDL sources. Defaults to None
+        verilog_sources (list, optional): List of extra Verilog sources. Defaults to None
         sim (str, optional): Simulator. Defaults to "icarus".
+        scala (bool, optional): True for SpinalHDL source, False for Verilog source. Defaults to True
     """
 
     # TODO: multi level package path still isn't ideal
 
     sim = os.getenv("SIM", sim)
 
+    if verilog_name == None:
+        verilog_name = f"{top_level}.v"
+
     # Get path of top level script
     file_dir = Path(os.path.abspath(sys.argv[0])).parent
 
     proj_path = Path(file_dir / proj_dir).resolve()
     source_path = Path(proj_path / source_dir).resolve()
-    gen_path = Path(proj_path / gen_dir / f"{top_level}.v").resolve()
+    gen_path = Path(proj_path / gen_dir / verilog_name).resolve()
 
     if scala_name == None:
         scala_name = top_level
+
+    if scala_object == None:
+        scala_object = f"{top_level}Verilog"
 
     if package_path is not None:
         sources = [source_path / package_path / f"{scala_name}.scala"]
@@ -75,9 +88,9 @@ def run_wrapper(
     if scala:
         if last_modified(sources) > last_modified(gen_path):
             if package_path is not None:
-                cmd = ["sbt", f"runMain {package}.{package_path}.{top_level}Verilog"]
+                cmd = ["sbt", f"runMain {package}.{package_path}.{scala_object}"]
             else:
-                cmd = ["sbt", f"runMain {package}.{top_level}Verilog"]
+                cmd = ["sbt", f"runMain {package}.{scala_object}"]
             print(" ".join(cmd))
             ret = subprocess.run(cmd, cwd=proj_path.resolve())
             assert ret.returncode == 0, "SpinalHDL error"
@@ -90,7 +103,7 @@ def run_wrapper(
         verilog_sources = []
 
     if scala:
-        verilog_sources.append(proj_path / gen_dir / f"{top_level}.v")
+        verilog_sources.append(proj_path / gen_dir / verilog_name)
 
     runner = get_runner(sim)
 
