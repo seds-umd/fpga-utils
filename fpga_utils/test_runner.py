@@ -38,6 +38,7 @@ def run_wrapper(
     verilog_sources: list = None,
     sim: str = "icarus",
     scala: bool = True,
+    test_module: str = None,
 ):
     """SpinalHDL wrapper for cocotb test runner
 
@@ -55,6 +56,7 @@ def run_wrapper(
         verilog_sources (list, optional): List of extra Verilog sources. Defaults to None
         sim (str, optional): Simulator. Defaults to "icarus".
         scala (bool, optional): True for SpinalHDL source, False for Verilog source. Defaults to True
+        test_module (str, optional): Python module containing the cocotb tests. Defaults to test_$scala_name (lowercased)
     """
 
     # TODO: multi level package path still isn't ideal
@@ -76,6 +78,9 @@ def run_wrapper(
 
     if scala_object == None:
         scala_object = f"{top_level}Verilog"
+
+    if test_module is None:
+        test_module = f"test_{scala_name.lower()}"
 
     if package_path is not None:
         sources = [source_path / package_path / f"{scala_name}.scala"]
@@ -125,7 +130,7 @@ def run_wrapper(
 
     runner.test(
         hdl_toplevel=top_level,
-        test_module=f"test_{scala_name.lower()}",
+        test_module=test_module,
         waves=True,
         test_args=run_args,
     )

@@ -5,15 +5,13 @@ import numpy as np
 from cocotb.handle import HierarchyObject
 from cocotbext.axi import AxiStreamBus, AxiStreamSink, AxiStreamSource, AxiStreamFrame
 
-from gps import xilinx_fft
-
 
 # Pack complex numbers into 16 bit samples
 def fft_pack_complex(data: np.ndarray):
     data = data.astype(np.complex128)
     data = data * 128
-    data_re = data.real.astype(np.int16)
-    data_im = data.imag.astype(np.int16)
+    data_re = data.real.astype(np.int16).astype(np.uint16)
+    data_im = data.imag.astype(np.int16).astype(np.uint16)
     data_bits = (data_re & 0xFF) | ((data_im & 0xFF) << 8)
     data_bits = [int(x) for x in data_bits]
 
@@ -53,6 +51,10 @@ class FFT_Sim:
 
         self.module = module
         self.log = logging.getLogger(f"cocotb.Xilinx_FFT")
+
+        # Only FFT simulation needs the platform-specific bit-accurate C model.
+        # Packing helpers are also used by simulations that do not use that IP.
+        from gps import xilinx_fft
 
         # Create xilinx_fft module to use bit accurate C model
         self.size_log = size
