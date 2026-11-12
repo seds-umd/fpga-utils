@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from cocotb.runner import get_runner
@@ -22,6 +23,21 @@ def last_modified(sources: Union[Path, List[Path]]):
             t = 0
 
     return t
+
+
+def find_sbt():
+    """Locate the sbt launcher.
+
+    On Windows the launcher is ``sbt.bat``. ``subprocess`` resolves a bare
+    program name through ``CreateProcess``, which only tries ``.exe``, so the
+    batch file has to be found explicitly and run by its full path.
+    """
+    names = ["sbt.bat", "sbt"] if os.name == "nt" else ["sbt"]
+    for name in names:
+        path = shutil.which(name)
+        if path:
+            return path
+    raise FileNotFoundError("sbt was not found on PATH")
 
 
 def run_wrapper(
@@ -90,12 +106,18 @@ def run_wrapper(
     if spinal_sources is not None:
         sources.extend([source_path / f"{source}.scala" for source in spinal_sources])
 
+    # A top level also depends on every module it instantiates, and callers
+    # rarely list them all. Watch the whole source tree so that a change to any
+    # module regenerates the Verilog instead of silently testing a stale copy.
+    listed = set(sources)
+    sources.extend(p for p in sorted(source_path.rglob("*.scala")) if p not in listed)
+
     if scala:
         if last_modified(sources) > last_modified(gen_path):
             if package_path is not None:
-                cmd = ["sbt", f"runMain {package}.{package_path}.{scala_object}"]
+                cmd = [find_sbt(), f"runMain {package}.{package_path}.{scala_object}"]
             else:
-                cmd = ["sbt", f"runMain {package}.{scala_object}"]
+                cmd = [find_sbt(), f"runMain {package}.{scala_object}"]
             print(" ".join(cmd))
             ret = subprocess.run(cmd, cwd=proj_path.resolve())
             assert ret.returncode == 0, "SpinalHDL error"
